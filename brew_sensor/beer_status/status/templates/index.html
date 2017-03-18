@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h3>Beer Status</h3>
+<table class="table">
+    <tr>
+        <th>Period</th>
+        <th>Probe One</th>
+        <th>Probe Two</th>
+        <th>Air</th>
+        <th>Room</th>
+    </tr>
+    <tr>
+        <td>{{ last.date }}</td>
+        <td>{{ last.probe_one }}°C</td>
+        <td>{{ last.probe_two }}°C</td>
+        <td>{{ last.air }}°C</td>
+        <td>{{ last.room }}°C</td>
+    </tr>
+    <tr>
+        <td>Ten Minutes</td>
+        <td>{{ ten_min.probe_one__avg|floatformat:"2" }}°C</td>
+        <td>{{ ten_min.probe_two__avg|floatformat:"2" }}°C</td>
+        <td>{{ ten_min.air__avg|floatformat:"2" }}°C</td>
+        <td>{{ ten_min.room__avg|floatformat:"2" }}°C</td>
+    </tr>
+    <tr>
+        <td>One Hour</td>
+        <td>{{ one_hour.probe_one__avg|floatformat:"2" }}°C</td>
+        <td>{{ one_hour.probe_two__avg|floatformat:"2" }}°C</td>
+        <td>{{ one_hour.air__avg|floatformat:"2" }}°C</td>
+        <td>{{ one_hour.room__avg|floatformat:"2" }}°C</td>
+    </tr>
+    <tr>
+        <td>Two Hour</td>
+        <td>{{ two_hour.probe_one__avg|floatformat:"2" }}°C</td>
+        <td>{{ two_hour.probe_two__avg|floatformat:"2" }}°C</td>
+        <td>{{ two_hour.air__avg|floatformat:"2" }}°C</td>
+        <td>{{ two_hour.room__avg|floatformat:"2" }}°C</td>
+    </tr>
+    <tr>
+        <td>Three Hour</td>
+        <td>{{ thr_hour.probe_one__avg|floatformat:"2" }}°C</td>
+        <td>{{ thr_hour.probe_two__avg|floatformat:"2" }}°C</td>
+        <td>{{ thr_hour.air__avg|floatformat:"2" }}°C</td>
+        <td>{{ thr_hour.room__avg|floatformat:"2" }}°C</td>
+    </tr>
+    <tr>
+        <td>Four Hour</td>
+        <td>{{ fou_hour.probe_one__avg|floatformat:"2" }}°C</td>
+        <td>{{ fou_hour.probe_two__avg|floatformat:"2" }}°C</td>
+        <td>{{ fou_hour.air__avg|floatformat:"2" }}°C</td>
+        <td>{{ fou_hour.room__avg|floatformat:"2" }}°C</td>
+    </tr>
+</table>
+{% endblock %}
