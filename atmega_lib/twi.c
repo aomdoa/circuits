@@ -9,10 +9,17 @@ uint8_t twi_start(uint8_t address) {
 #ifdef DEBUG
     printf("twi_start: (0x%02x)\n", address);
 #endif
-    uint8_t status;
+    uint8_t status, wait = 0;
     //Send start
     TWCR = (1 << TWINT) | (1 << TWSTA) | (1 << TWEN);
-    while(!(TWCR & (1 << TWINT)));
+    while(!(TWCR & (1 << TWINT))) {
+        delayms(1);
+        wait++;
+        if(wait > 254) {
+            printf("ERRROR\n");
+            return TWI_ERROR;
+        }
+    }
     status = TWSR;
     if((status & 0xf8) != TW_START && (status & 0xf8) != TW_REP_START) {
 #ifdef DEBUG

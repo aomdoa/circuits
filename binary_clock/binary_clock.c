@@ -20,14 +20,126 @@ ISR(INT0_vect) {
     return;
 }
 
+ISR(TIMER0_OVF_vect) {
+    uint8_t display_button = PINC & (1 << PC2);
+    uint8_t counter_button = PINC & (1 << PC3);
+    uint8_t seconds_button = PINC & (1 << PC4);
+    uint8_t minutes_button = PINC & (1 << PC5);
+    uint8_t hours_button = PINC & (1 << PC6);
+    RtcTime new_time = read_time();
+
+    if(display_button) {
+        if(display_pushed == 0) {
+            display_pushed = 1;
+            if(seconds_button || minutes_button || hours_button) {
+                if(seconds_button) {
+                    if(debug) {
+                        printf("Change seconds colour\n");
+                    }
+                    current_colour.second++;
+                    if(current_colour.second > 7) {
+                        current_colour.second = 1;
+                    }
+                }
+                if(minutes_button) {
+                    if(debug) {
+                        printf("Change minutes colour\n");
+                    }
+                    current_colour.minute++;
+                    if(current_colour.minute > 7) {
+                        current_colour.minute = 1;
+                    }
+                }
+                if(hours_button) {
+                    if(debug) {
+                        printf("Change hours colour\n");
+                    }
+                    current_colour.hour++;
+                    if(current_colour.hour > 7) {
+                        current_colour.hour = 1;
+                    }
+                }
+            } else {
+                if(debug) {
+                    printf("Toggling display\n");
+                }
+                display_mode++;
+                if(display_mode > DISPLAY_CYCLE) {
+                    display_mode = DISPLAY_OFF;
+                    current_colour.second = 7;
+                    current_colour.minute = 7;
+                    current_colour.hour = 7;
+                }
+            }
+        }
+    } else {
+        display_pushed = 0;
+    }
+
+    if(counter_button) {
+        if(counter_pushed == 0) {
+            counter_pushed = 1;
+            if(seconds_button) {
+                write_second(0);
+                new_time.second = 0;
+            }
+            if(minutes_button) {
+                new_time.minute++;
+                if(new_time.minute > 59) {
+                    new_time.minute = 0;
+                }
+                if(debug) {
+                    printf("Change minutes to %d\n", new_time.minute);
+                }
+                write_minute(new_time.minute);
+            }
+            if(hours_button) {
+                new_time.hour++;
+                if(new_time.hour > 23) {
+                    new_time.hour = 0;
+                }
+                if(debug) {
+                    printf("Change hours to %d\n", new_time.hour);
+                }
+                write_hour(new_time.hour);
+            }
+        }
+    } else {
+        counter_pushed = 0;
+    }
+
+    if(display_mode == DISPLAY_CYCLE) {
+        current_colour.second = current_time.second % 7 + 1;
+        current_colour.minute = current_time.minute % 7 + 1;
+        current_colour.hour = current_time.hour % 7 + 1;
+    } else if(display_mode == DISPLAY_RANDOM) {
+        if(current_time.second != new_time.second) {
+            current_colour.second = (rand() + current_time.second) % 7 + 1;
+            current_colour.minute = (rand() + current_time.minute) % 7 + 1;
+            current_colour.hour = (rand() + current_time.hour) % 7 + 1;
+        }
+    }
+
+    current_time = new_time;
+    if(display_mode != DISPLAY_OFF) {
+        display_time(current_time);
+    } else {
+        clear_display();
+    }
+}
+
 void display_time(RtcTime time) {
+    if(debug) {
+        printf("Colour: %d - %d - %d\n", current_colour.hour, current_colour.minute, current_colour.second);
+    }
+
     PORTA = ((time.minute << 6) & 0xc0) + time.second;
     if(debug) {
         printf("PB0: %03d, ", PORTA);
     }
     PORTB |= (1 << PB0);
     PORTB &= ~(1 << PB0);
-    if(debug) delayms(500);
+    if(debug) delayms(100);
 
     PORTA = ((time.hour << 4) & 0xf0) + (time.minute >> 2);
     if(debug) {
@@ -35,58 +147,33 @@ void display_time(RtcTime time) {
     }
     PORTB |= (1 << PB1);
     PORTB &= ~(1 << PB1);
-    if(debug) delayms(500);
+    if(debug) delayms(100);
 
-    PORTA = ((time.month << 6) & 0xc0) + ((time.day << 1) & 0x3e) + (time.hour >> 4);
+    PORTA = (0xfe ^ ((current_colour.hour << 7) + (current_colour.minute << 4) + (current_colour.second << 1))) + (time.hour >> 4);
     if(debug) {
         printf("PB2: %03d, ", PORTA);
     }
     PORTB |= (1 << PB2);
     PORTB &= ~(1 << PB2);
-    if(debug) delayms(500);
+    if(debug) delayms(100);
 
-    PORTA = ((time.year << 2) & 0xfc) + (time.month >> 2);
+    PORTA = 0xff ^ ((current_colour.hour >> 1));
     if(debug) {
         printf("PB3: %03d, ", PORTA);
     }
     PORTB |= (1 << PB3);
     PORTB &= ~(1 << PB3);
-    if(debug) delayms(500);
-
-    PORTA = (0xfe ^ ((current_colour.hour << 7) + (current_colour.minute << 4) + (current_colour.second << 1))) + (time.year >> 6);
-    if(debug) {
-        printf("PB4: %03d, ", PORTA);
-    }
-    PORTB |= (1 << PB4);
-    PORTB &= ~(1 << PB4);
-    if(debug) delayms(500);
-
-    PORTA = 0xff ^ ((current_colour.month << 5) + (current_colour.day << 2) + (current_colour.hour >> 1));
-    if(debug) {
-        printf("PD4: %03d, ", PORTA);
-    }
-    PORTC |= (1 << PC6);
-    PORTC &= ~(1 << PC6);
-    if(debug) delayms(500);
-
-    PORTA = ~(current_colour.year) & 0x07;
-    if(debug) {
-        printf("PD5: %03d\n", PORTA);
-    }
-    PORTC |= (1 << PC7);
-    PORTC &= ~(1 << PC7);
-    if(debug) delayms(500);
-
+    if(debug) delayms(100);
 }
 
 void clear_display() {
     PORTA = 0x00;
-    PORTB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
-    PORTB &= ~((1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4));
+    PORTB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3);
+    PORTB &= ~((1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3));
 }
 
 void print_time(RtcTime print) {
-    printf("%02d-%02d-%02d %02d:%02d:%02d\n", print.year, print.month, print.day, print.hour, print.minute, print.second);
+    printf("%02d:%02d:%02d\n", print.hour, print.minute, print.second);
 }
 
 RtcTime read_time() {
@@ -98,10 +185,6 @@ RtcTime read_time() {
     time.second = bcd2i(twi_readAck() & 0x7f);
     time.minute = bcd2i(twi_readAck() & 0x7f);
     time.hour = bcd2i(twi_readAck() & 0x3f);
-    time.day = bcd2i(twi_readAck() & 0x3f);
-    twi_readAck(); //weekday - don't need
-    time.month = bcd2i(twi_readAck() & 0x1f);
-    time.year = bcd2i(twi_readAck());
     twi_stop();
     if(debug) {
         printf("RTC: ");
@@ -111,10 +194,11 @@ RtcTime read_time() {
 }
 
 void write_second(uint8_t second) {
-    twi_start(RTC | TWI_WRITE);
+    printf("Broken, not setting\n");
+    /*twi_start(RTC | TWI_WRITE);
     twi_write(0x02);
-    twi_write(i2bcd(second) & 0x7f);
-    twi_stop();
+    twi_write((i2bcd(second) & 0x7f) + 128);
+    twi_stop();*/
     return;
 }
 
@@ -130,30 +214,6 @@ void write_hour(uint8_t hour) {
     twi_start(RTC | TWI_WRITE);
     twi_write(0x04);
     twi_write(i2bcd(hour) & 0x3f);
-    twi_stop();
-    return;
-}
-
-void write_day(uint8_t day) {
-    twi_start(RTC | TWI_WRITE);
-    twi_write(0x05);
-    twi_write(i2bcd(day) & 0x3f);
-    twi_stop();
-    return;
-}
-
-void write_month(uint8_t month) {
-    twi_start(RTC | TWI_WRITE);
-    twi_write(0x07);
-    twi_write(i2bcd(month) & 0x1f);
-    twi_stop();
-    return;
-}
-
-void write_year(uint8_t year) {
-    twi_start(RTC | TWI_WRITE);
-    twi_write(0x08);
-    twi_write(i2bcd(year));
     twi_stop();
     return;
 }
@@ -212,26 +272,6 @@ uint8_t i2bcd(uint8_t i) {
  * 
  * PB2 - PORTA
  *  0 - HOUR-16
- *  1 - DAY-1
- *  2 - DAY-2
- *  3 - DAY-4
- *  4 - DAY-8
- *  5 - DAY-16
- *  6 - MONTH-1
- *  7 - MONTH-2
- *
- * PB3 - PORTA
- *  0 - MONTH-4
- *  1 - MONTH-8
- *  2 - YEAR-1
- *  3 - YEAR-2
- *  4 - YEAR-4
- *  5 - YEAR-8
- *  6 - YEAR-16
- *  7 - YEAR-32
- *
- * PB4 - PORTA
- *  0 - YEAR-64
  *  1 - SECOND-R
  *  2 - SECOND-G
  *  3 - SECOND-B
@@ -239,21 +279,16 @@ uint8_t i2bcd(uint8_t i) {
  *  5 - MINUTE-G
  *  6 - MINUTE-B
  *  7 - HOUR-R
- *
- * PC6 - PORTA
+
+ * PB3 - PORTA
  *  0 - HOUR-G
  *  1 - HOUR-B
- *  2 - DAY-R
- *  3 - DAY-G
- *  4 - DAY-B
- *  5 - MONTH-R
- *  6 - MONTH-G
- *  7 - MONTH-B
  *
- * PC7 - PORTA
- *  0 - YEAR-R
- *  1 - YEAR-G
- *  2 - YEAR-B
+ * PC2 - Input for display
+ * PC3 - Input for counter
+ * PC4 - Input for seconds
+ * PC5 - Input for minutes
+ * PC6 - Input for hours
  */
 
 uint8_t bcd2i(uint8_t bcd) {
@@ -268,41 +303,40 @@ int main() {
     current_colour.second = 7;
     current_colour.minute = 7;
     current_colour.hour = 7;
-    current_colour.day = 7;
-    current_colour.month = 7;
-    current_colour.year = 7;
 
     /**
      * PORTA is output for latches
-     * PB0,PB1, PB2, PB3, PB4, PC6, PC7 is output to latches
+     * PB0, PB1, PB2, PB3 is output to latches
+     * PC2 for input
      */
     DDRA = 0xff;
-    DDRB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
-    DDRC |= (1 << PC6) | (1 << PC7);
+    DDRB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3);
+    DDRC &= ~((1 << PC2) | (1 << PC3) | (1 << PC4) | (1 << PC5) | (1<< PC6));
 
     //Turn everything on
-    PORTB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
-    PORTC |= (1 << PC6) | (1 << PC7);
+    PORTB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3);
     PORTA = 0xff;
     delayms(1000);
     PORTA = 0x00;
-    PORTB &= ~((1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4));
-    PORTC &= ~((1 << PC6) | (1 << PC7));
+    PORTB &= ~((1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3));
 
 
     printf("Start\n");
     initialize_clock();
 
     // Rising edge for ISR0 - this is interrupt for read/display
-    EICRA |= (1 << ISC01);// | (1 << ISC00);
-    EIMSK |= (1 << INT0);
+//    EICRA |= (1 << ISC01);// | (1 << ISC00);
+//    EIMSK |= (1 << INT0);
+
+    // Timer 0 interrupt
+    TCCR0A = 0x00;
+    TCCR0B = (1<<CS00) | (1<<CS02);
+    TIMSK0 = 1<<TOIE0;
 
     //Clear everything
-    PORTB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
-    PORTC |= (1 << PC6) | (1 << PC7);
+    PORTB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3);
     PORTA = 0x00;
-    PORTB &= ~((1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4));
-    PORTC &= ~((1 << PC6) | (1 << PC7));
+    PORTB &= ~((1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3));
 
     sei();
     while(1) {
@@ -320,10 +354,7 @@ int main() {
             printf("\tS = set second\n");
             printf("\tM = set minute\n");
             printf("\tH = set hour\n");
-            printf("\tD = set day\n");
-            printf("\tO = set month\n");
-            printf("\tY = set year\n");
-            printf("\tC = set colour (SMHDMY) (1=R, 2=G, 4=B)\n");
+            printf("\tC = set colour (SMH) (1=R, 2=G, 4=B)\n");
         } else if(command == 'S') {
             printf("Enter second: ");
             echo_input(input, 3);
@@ -358,44 +389,11 @@ int main() {
                 write_hour(value);
                 delayms(50);
             }
-        } else if(command == 'D') {
-            printf("Enter day: ");
-            echo_input(input, 3);
-            value = atoi(input);
-            if(value < 1 || value > 31) {
-                printf("\nValue %s must be between 1 and 31.\n", input);
-            } else {
-                printf("\nWill set day to %d\n", value);
-                write_day(value);
-                delayms(50);
-            }
-        } else if(command == 'O') {
-            printf("Enter month: ");
-            echo_input(input, 3);
-            value = atoi(input);
-            if(value < 1 || value > 12) {
-                printf("\nValue %s must be between 1 and 12.\n", input);
-            } else {
-                printf("\nWill set month to %d\n", value);
-                write_month(value);
-                delayms(50);
-            }
-        } else if(command == 'Y') {
-            printf("Enter year: ");
-            echo_input(input, 3);
-            value = atoi(input);
-            if(value < 1 || value > 99) {
-                printf("\nValue %s must be between 1 and 99.\n", input);
-            } else {
-                printf("\nWill set year to %d\n", value);
-                write_year(value);
-                delayms(50);
-            }
         } else if(command == 'C') {
-            printf("Enter colour (SMHDMY): ");
-            echo_input(input, 6);
+            printf("Enter colour (SMH): ");
+            echo_input(input, 3);
             printf("\nSetting colour: %s\n", input);
-            for(i=0;i<7;i++) {
+            for(i=0;i<4;i++) {
                 if(input[i] == '\0') {
                     break;
                 }
@@ -413,21 +411,6 @@ int main() {
                     current_colour.hour = (input[i] - '0') & 0x07;
                     if(debug) {
                         printf("\nhour=%d\n", current_colour.hour);
-                    }
-                } else if(i == 3) {
-                    current_colour.day = (input[i] - '0') & 0x07;
-                    if(debug) {
-                        printf("\nday=%d\n", current_colour.day);
-                    }
-                } else if(i == 4) {
-                    current_colour.month = (input[i] - '0') & 0x07;
-                    if(debug) {
-                        printf("\nmonth=%d\n", current_colour.month);
-                    }
-                } else if(i == 5) {
-                    current_colour.year = (input[i] - '0') & 0x07;
-                    if(debug) {
-                        printf("\nyear=%d\n", current_colour.year);
                     }
                 }
             }

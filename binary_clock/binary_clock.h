@@ -8,27 +8,30 @@
 #define GREEN 0x02
 #define BLUE 0x04
 
+#define DISPLAY_OFF 0
+#define DISPLAY_ON 1
+#define DISPLAY_RANDOM 2
+#define DISPLAY_CYCLE 3
+
 
 /**
  * When set to 1 turns debug messaging on on the serial port
  */
 volatile uint8_t debug = 0;
+volatile uint8_t display_pushed = 0;
+volatile uint8_t counter_pushed = 0;
+volatile uint8_t display_mode = 1;
+
 typedef struct {
     uint8_t second; //integer
     uint8_t minute; //integer
     uint8_t hour;   //integer
-    uint8_t day;    //integer
-    uint8_t month;   //integer
-    uint8_t year;    //integer
 } RtcTime;
 
 typedef struct {
     uint8_t second;
     uint8_t minute;
     uint8_t hour;
-    uint8_t day;
-    uint8_t month;
-    uint8_t year;
 } Colour;
 
 /**
@@ -57,8 +60,6 @@ void print_time(RtcTime);
 void write_second(uint8_t);
 void write_minute(uint8_t);
 void write_hour(uint8_t);
-void write_month(uint8_t);
-void write_year(uint8_t);
 /**
  * Receive and display characters through serial
  * char * input string
